@@ -1,0 +1,46 @@
+include:
+  - project: "to-be-continuous/docker"
+    ref: "2.0.0"
+    file: "/templates/gitlab-ci-docker.yml"
+
+variables:
+  PROD_REF: "/^main$/"
+  AUTODEPLOY_TO_PROD: "true" # Always publish
+
+  DOCKER_REGISTRY_RELEASE_USER: kiliandeca
+  # DOCKER_REGISTRY_RELEASE_PASSWORD: # Defined in CI/CD Settings
+  DOCKER_RELEASE_IMAGE: docker.io/kiliandeca/excalidraw:latest
+
+stages:
+  - build
+  - package-build
+  - package-test
+  - publish
+
+.node-template:
+  image: node:14-alpine
+  before_script:
+    # https://gitlab.com/gitlab-org/gitlab/-/merge_requests/25758#about-yarn
+    # We add --prod false because yarn also read  the NODE_ENV env var required for prod build and doesn't install the dev dependencies
+    - yarn install --frozen-lockfile --cache-folder .yarn-cache --prefer-offline --prod false
+  cache:
+    key: yarn-cache
+    paths:
+      - .yarn-cache
+
+node-test:
+  stage: build
+  extends: .node-template
+  script:
+    - npm run test
+
+node-build:
+  stage: build
+  extends: .node-template
+  variables:
+    NODE_ENV: production
+  script:
+    - npm run build:app:docker
+  artifacts:
+    paths:
+      - build
